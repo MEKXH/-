@@ -19,9 +19,9 @@ def print_and_log(s):
     with open("./result/logs.txt", "a") as f:
         f.write(s + "\n")
 
-world = gpd.read_file(r'G:\【立方数据学社】广东省\用来提取数据的行政区划数据_来源于数读城事\全国面.shp')
-df = pd.read_excel(r"C:\Users\szu\Desktop\危险系数表.xlsx")
-death_rate = pd.read_excel(r"C:\Users\szu\Desktop\全球死亡率.xlsx",sheet_name="Sheet1")
+world = gpd.read_file(r'.shp')
+df = pd.read_excel(r"系数表.xlsx")
+death_rate = pd.read_excel(r"\全球死亡率.xlsx",sheet_name="Sheet1")
 dicts = {
     "COPD": dict(zip(df["PM2.5"], df["RR_COPD"])),
     "LNC": dict(zip(df["PM2.5"], df["RR_LNC"])),
@@ -87,12 +87,11 @@ for year in range(2000, 2020):
         gdf = gpd.GeoDataFrame([row])
         pm25, pm25_meta = clip(
             gdf,
-            fr"E:\逐年数据\全国范围的数据\tif格式的数据\数据\{year}.tif",
+            fr".tif",
             True,
         )
-        pop, pop_meta = clip(gdf, fr'E:\柳叶刀-中国PM2.5公平性以及健康负担研究\CHN_ppp_{year}_1km_Aggregated.tif', False, pm25.shape[0], pm25.shape[1])
-
-        save_to = fr"E:\CHN过早死亡率\{year}\{region}"
+        pop, pop_meta = clip(gdf, fr'.tif', False, pm25.shape[0], pm25.shape[1])
+        save_to = fr"\{year}\{region}"
         if not os.path.exists(save_to):
             os.makedirs(save_to)
 
@@ -214,63 +213,3 @@ for year in range(2000, 2020):
 #             with rasterio.open(f"{save_to}/{type}.tif", "w", **pm25_meta) as dst:
 #                 dst.write(result.astype(rasterio.float32), 1)
 #     print_and_log(f"----- {year} 年处理完成 -----")
-
-import os
-import rasterio
-import rasterio.merge
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-import numpy as np
-import matplotlib.font_manager as fm
-import pandas as pd
-from matplotlib.ticker import FormatStrFormatter
-
-for year in range(2000, 2020):
-    for index, type in enumerate(["COPD", "LNC", "LRI", "IHD", "STR"]):
-        dirs = os.listdir(fr"E:\CHN过早死亡率\{year}")
-        tifs = [fr"E:\CHN过早死亡率\{year}\{dir}\{type}.tif" for dir in dirs if os.path.exists(fr"E:\CHN过早死亡率\{year}\{dir}\{type}.tif")]
-        src_files_to_mosaic = [rasterio.open(tif) for tif in tifs]
-        dest, out_transform = rasterio.merge.merge(src_files_to_mosaic)
-        out_meta = src_files_to_mosaic[0].meta.copy()
-        out_meta.update({"driver": "GTiff", "height": dest.shape[1], "width": dest.shape[2], "transform": out_transform})
-        with rasterio.open(fr"E:\CHN过早死亡率\{year}\{type}.tif", "w", **out_meta) as out:
-            out.write(dest)
-            print(f"{year} {type} 合并完成")
-
-#
-from osgeo import gdal
-import numpy as np
-for year in range(2000, 2020):
-    # 输入文件名
-    input_files = [fr'E:\CHN过早死亡率\{year}\COPD.tif', fr'E:\CHN过早死亡率\{year}\LNC.tif', fr'E:\CHN过早死亡率\{year}\LRI.tif', fr'E:\CHN过早死亡率\{year}\IHD.tif', fr'E:\CHN过早死亡率\{year}\STR.tif']
-    output_file = fr'E:\CHN过早死亡率\{year}\合并new.tif'
-
-    # 打开第一个输入文件，获取基本信息
-    ds = gdal.Open(input_files[0])
-    rows = ds.RasterYSize
-    cols = ds.RasterXSize
-    bands = ds.RasterCount
-
-    # 创建一个数组来存储累加的像素值
-    sum_array = np.zeros((rows, cols), dtype=np.float32)
-
-    # 逐个打开输入文件并将像素值相加
-    for file in input_files:
-        ds = gdal.Open(file)
-        band = ds.GetRasterBand(1)
-        data = band.ReadAsArray()
-        sum_array += data
-
-    # 创建输出文件
-    driver = gdal.GetDriverByName('GTiff')
-    out_ds = driver.Create(output_file, cols, rows, 1, gdal.GDT_Float32)
-    out_band = out_ds.GetRasterBand(1)
-    out_band.WriteArray(sum_array)
-
-    # 设置地理参考信息和投影信息
-    out_ds.SetGeoTransform(ds.GetGeoTransform())
-    out_ds.SetProjection(ds.GetProjection())
-    # 关闭文件
-    out_band = None
-    out_ds = None
-    print(f"--------{year}合并完成---------")
